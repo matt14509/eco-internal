@@ -2,6 +2,7 @@
 #include "MinHook.h"
 #include "Vector.h"
 #include <cstdio>
+#include "memory.h"
 
 
 
@@ -13,13 +14,14 @@ typedef Vector3(*tGetPosition)(void* transform);
 typedef void(*tUpdate)(void* _this);
 typedef void(*tToggleFly)(void* _this);
 typedef void(*tPlayer_SetPosition)(void* _this,Vector3 pos);
+typedef void* (*tGetMotor)(void* playerBase);
 
 tPlayer_SetPosition Player_SetPosition = nullptr;
 tToggleFly ToggleFly = nullptr;
 tUpdate oUpdate = nullptr;
 tSetPosition SetPosition = nullptr;
 tGetPosition GetPosition = nullptr;
-
+tGetMotor GetMotor = nullptr;
 
 
 void hkUpdate(void* _this)
@@ -27,7 +29,7 @@ void hkUpdate(void* _this)
 
     if (GetAsyncKeyState('F') & 0x8000)
     {
-        Sleep(30);
+        Sleep(50);
         ToggleFly(_this);
 
     }
@@ -36,7 +38,20 @@ void hkUpdate(void* _this)
         Sleep(30);
         Player_SetPosition(_this,Vector3{ 763,1000,543 });
     }
-
+    if (GetAsyncKeyState(VK_NUMPAD4) & 0x8000)
+    {
+      
+        void* motor = GetMotor(_this);
+        printf("Motor ptr = 0x%p\n", motor);
+        //memory::DumpMemory(motor, 1000);
+        //hl 1 bhop
+        memory::write<float>((uintptr_t)motor + 0x78, 15.0f);    // moveSpeed
+        memory::write<float>((uintptr_t)motor + 0x7C, 200.0f);   // maxSpeed
+        memory::write<float>((uintptr_t)motor + 0x84, 1000.0f);  // groundAccel
+        memory::write<float>((uintptr_t)motor + 0x88, 1000.0f);  // airAccel
+        memory::write<float>((uintptr_t)motor + 0xF8, 20.0f);    // jumpForce
+        memory::write<float>((uintptr_t)motor + 0x154, 15.0f);    // swim up speed
+    }
     if (GetAsyncKeyState(VK_NUMPAD1) & 0x8000)
     {
         Sleep(30);
@@ -83,7 +98,9 @@ DWORD WINAPI MainThread(LPVOID param)
     //SetPosition = (tSetPosition)setPositionAddr;
     //GetPosition = (tGetPosition)getPositionAddr;
     uintptr_t getActivePlayersAddr = base + 0xB55640;
+    uintptr_t getMotorAddr = base + 0xB65B80;
 
+    GetMotor = (tGetMotor)getMotorAddr;
     GetActivePlayers = (tGetActivePlayers)getActivePlayersAddr;
     ToggleFly = (tToggleFly)toggleFlyAddr;
     Player_SetPosition = (tPlayer_SetPosition)Player_SetPositionAddr;
