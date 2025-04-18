@@ -60,7 +60,7 @@ DWORD WINAPI MainThread(LPVOID param)
     HMODULE hModule = (HMODULE)param;
 
 
-    AllocConsole(); // Создаёт новое консольное окно
+    AllocConsole(); 
 
 
     FILE* fp_out;
@@ -91,7 +91,7 @@ DWORD WINAPI MainThread(LPVOID param)
     MH_Initialize();
     MH_CreateHook((LPVOID)updateAddr, &hkUpdate, reinterpret_cast<LPVOID*>(&oUpdate));
     MH_EnableHook((LPVOID)updateAddr);
-    MessageBoxA(0, "Hooked! Для unhook нажми END", "Info", MB_OK);
+    MessageBoxA(0, "Hooked! END to unhook", "Info", MB_OK);
 
 
     while (true)
@@ -107,7 +107,7 @@ DWORD WINAPI MainThread(LPVOID param)
 
     MH_Uninitialize();
 
-    MessageBoxA(0, "Unhooked! DLL будет выгружена.", "Info", MB_OK);
+    MessageBoxA(0, "Unhooked!", "Info", MB_OK);
 
     if (fp_out) fclose(fp_out);
     if (fp_err) fclose(fp_err);
