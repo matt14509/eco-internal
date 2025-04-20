@@ -20,7 +20,7 @@ std::vector<void*> GetPlayerBasePointers(void* listPtr)
     // Unity List<T> â IL2CPP:
     // [0x00] void* klass
     // [0x08] void* monitor
-    // [0x10] void* items (PlayerBase**)
+    // [0x10] void* items 
     // [0x18] int size
     // [0x1C] int version
 

@@ -1,4 +1,5 @@
 #pragma once
+#include <json.hpp>
 class Vector2
 {
 public:
@@ -54,7 +55,7 @@ public:
 
 	Vector3 Clamp() const;
 };
-
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Vector3, x, y, z)
 struct ViewMatrix
 {
 public:

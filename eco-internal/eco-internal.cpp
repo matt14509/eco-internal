@@ -1,11 +1,13 @@
+//eco-internal.cpp
 #include <windows.h>
 #include "MinHook.h"
 #include "Vector.h"
 #include <cstdio>
+
 #include "memory.h"
-
-
-
+#include"GUI_main_menu.h"
+#include "offsets.h"
+#include <ConfigInstance.h>
 
 typedef void* (*tGetActivePlayers)();
 tGetActivePlayers GetActivePlayers = nullptr;
@@ -13,7 +15,7 @@ typedef void(*tSetPosition)(void* transform, Vector3 pos);
 typedef Vector3(*tGetPosition)(void* transform);
 typedef void(*tUpdate)(void* _this);
 typedef void(*tToggleFly)(void* _this);
-typedef void(*tPlayer_SetPosition)(void* _this,Vector3 pos);
+typedef void(*tPlayer_SetPosition)(void* _this, Vector3 pos);
 typedef void* (*tGetMotor)(void* playerBase);
 
 tPlayer_SetPosition Player_SetPosition = nullptr;
@@ -24,81 +26,64 @@ tGetPosition GetPosition = nullptr;
 tGetMotor GetMotor = nullptr;
 
 
+void* g_debug_motor_ptr = nullptr;
+
+
 void hkUpdate(void* _this)
 {
-
-    if (GetAsyncKeyState('F') & 0x8000)
+    if (ConfigInstance.Movement.needToggleFly)
     {
-        Sleep(50);
         ToggleFly(_this);
+        ConfigInstance.Movement.needToggleFly = false; 
+    }
 
-    }
-    if (GetAsyncKeyState(VK_NUMPAD2) & 0x8000)
+        memory::read<Vector3>((uintptr_t)_this + 0xE0, ConfigInstance.Movement.saved_pos);
+
+    if (ConfigInstance.Movement.needTeleport)
     {
-        Sleep(30);
-        Player_SetPosition(_this,Vector3{ 763,1000,543 });
+        Player_SetPosition(_this, ConfigInstance.Movement.teleportCoords);
+        ConfigInstance.Movement.needTeleport = false; 
     }
-    if (GetAsyncKeyState(VK_NUMPAD4) & 0x8000)
-    {
-      
-        void* motor = GetMotor(_this);
-        printf("Motor ptr = 0x%p\n", motor);
-        //memory::DumpMemory(motor, 1000);
-        //hl 1 bhop
-        memory::write<float>((uintptr_t)motor + 0x78, 15.0f);    // moveSpeed
-        memory::write<float>((uintptr_t)motor + 0x7C, 200.0f);   // maxSpeed
-        memory::write<float>((uintptr_t)motor + 0x84, 1000.0f);  // groundAccel
-        memory::write<float>((uintptr_t)motor + 0x88, 1000.0f);  // airAccel
-        memory::write<float>((uintptr_t)motor + 0xF8, 20.0f);    // jumpForce
-        memory::write<float>((uintptr_t)motor + 0x154, 15.0f);    // swim up speed
-    }
+
+    void* motor = GetMotor(_this);
+    g_debug_motor_ptr = motor;
+ 
+        memory::write<float>((uintptr_t)motor + 0x78, ConfigInstance.Movement.moveSpeed);    // moveSpeed
+        memory::write<float>((uintptr_t)motor + 0x7C, ConfigInstance.Movement.maxSpeed);   // maxSpeed
+        memory::write<float>((uintptr_t)motor + 0x84, ConfigInstance.Movement.groundAccel);  // groundAccel
+        memory::write<float>((uintptr_t)motor + 0x88, ConfigInstance.Movement.airAccel);  // airAccel
+        memory::write<float>((uintptr_t)motor + 0xF8, ConfigInstance.Movement.jumpForce);    // jumpForce
+        memory::write<float>((uintptr_t)motor + 0x154, ConfigInstance.Movement.swimUpSpeed);   // swim up speed
+    
     if (GetAsyncKeyState(VK_NUMPAD1) & 0x8000)
     {
         Sleep(30);
         void* listPtr = GetActivePlayers();
         printf("listPtr = 0x%p\n", listPtr);
-
     }
-    //void* transform = *(void**)((uintptr_t)_this + TransformOffset);
-    //if (transform)
-    //{
-    //    Vector3 curPos = GetPosition(transform);
-    //    Vector3 pos = curPos + Vector3{ 0.0f, 1.0f, 0.0f };
-    //    SetPosition(transform, pos);
-    //}
-    oUpdate(_this); 
+    oUpdate(_this);
 }
+
+
 
 DWORD WINAPI MainThread(LPVOID param)
 {
-
     HMODULE hModule = (HMODULE)param;
 
-
-    AllocConsole(); 
-
-
+    AllocConsole();
     FILE* fp_out;
     FILE* fp_err;
     FILE* fp_in;
-
     freopen_s(&fp_out, "CONOUT$", "w", stdout);
     freopen_s(&fp_err, "CONOUT$", "w", stderr);
     freopen_s(&fp_in, "CONIN$", "r", stdin);
 
-
-
     uintptr_t base = (uintptr_t)GetModuleHandleA("GameAssembly.dll");
-    //uintptr_t setPositionAddr = base + 0x4B1B690;
-    //uintptr_t getPositionAddr = base + 0x4B1A930;
-    uintptr_t updateAddr = base + 0xB64340;
-
-    uintptr_t toggleFlyAddr = base + 0xB64150;
-    uintptr_t Player_SetPositionAddr = base + 0xB63B10;
-    //SetPosition = (tSetPosition)setPositionAddr;
-    //GetPosition = (tGetPosition)getPositionAddr;
+    uintptr_t updateAddr = base + offsets::Player::update_RVA;
+    uintptr_t toggleFlyAddr = base + offsets::Player::toggle_fly_RVA;
+    uintptr_t Player_SetPositionAddr = base + offsets::Player::set_position_RVA;
     uintptr_t getActivePlayersAddr = base + 0xB55640;
-    uintptr_t getMotorAddr = base + 0xB65B80;
+    uintptr_t getMotorAddr = base + offsets::Player::get_motor_RVA;
 
     GetMotor = (tGetMotor)getMotorAddr;
     GetActivePlayers = (tGetActivePlayers)getActivePlayersAddr;
@@ -108,8 +93,22 @@ DWORD WINAPI MainThread(LPVOID param)
     MH_Initialize();
     MH_CreateHook((LPVOID)updateAddr, &hkUpdate, reinterpret_cast<LPVOID*>(&oUpdate));
     MH_EnableHook((LPVOID)updateAddr);
-    MessageBoxA(0, "Hooked! END to unhook", "Info", MB_OK);
 
+
+    void* pPresent = window::GetPresentAddress();
+    printf("Present address: %p\n", pPresent);
+    if (pPresent)
+    {
+        MH_CreateHook(pPresent, &window::hkPresent, reinterpret_cast<void**>(&window::oPresent));
+        if (MH_EnableHook(pPresent) != MH_OK) printf("MH_EnableHook(pPresent) failed!\n"); 
+        else
+        {
+            printf("MH_EnableHook(pPresent) successful!\n");
+        }
+        
+    }
+
+    MessageBoxA(0, "Hooked! END to unhook", "Info", MB_OK);
 
     while (true)
     {
@@ -119,8 +118,26 @@ DWORD WINAPI MainThread(LPVOID param)
     }
 
     MH_DisableHook((LPVOID)updateAddr);
-
     MH_RemoveHook((LPVOID)updateAddr);
+
+    if (pPresent)
+    {
+        MH_DisableHook(pPresent);
+        MH_RemoveHook(pPresent);
+    }
+    if (window::oWndProc && window::g_hWnd)
+    {
+        SetWindowLongPtr(window::g_hWnd, GWLP_WNDPROC, (LONG_PTR)window::oWndProc);
+        window::oWndProc = nullptr;
+    }
+
+    if (window::g_ImGuiInitialized)
+    {
+        ImGui_ImplDX11_Shutdown();
+        ImGui_ImplWin32_Shutdown();
+        ImGui::DestroyContext();
+
+    }
 
     MH_Uninitialize();
 
@@ -130,6 +147,7 @@ DWORD WINAPI MainThread(LPVOID param)
     if (fp_err) fclose(fp_err);
     if (fp_in)  fclose(fp_in);
 
+ 
     FreeConsole();
 
     FreeLibraryAndExitThread(hModule, 0);

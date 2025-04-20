@@ -1,0 +1,13 @@
+#pragma once
+#include <windows.h>
+#include <WinUser.h>
+#include <iostream>
+#include <shlobj.h> 
+#include <filesystem>
+#include <fstream> 
+#include "json.hpp"
+#include <Vector.h>
+#include <d3d11.h>
+#include <dxgi.h>
+#include <tchar.h>
+#include <cstdint>
